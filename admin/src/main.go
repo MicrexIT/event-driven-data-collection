@@ -120,9 +120,7 @@ func (g *GraphResponse) findOrCreateNode(name string, label string) int64 {
 
 func (g *GraphResponse) createEdge(sourceIndex int64, targetIndex int64, edgeType string, properties map[string]interface{}, id int64) error {
 	var items int64 = 0
-	if edgeType == "BOUGHT" {
-		items = properties["items"].(int64)
-	}
+	items = properties["items"].(int64)
 	e := Edge{Source: sourceIndex, Target: targetIndex, Type: edgeType, Items: items, Id: id}
 	g.Edges = append(g.Edges, e)
 	return nil
