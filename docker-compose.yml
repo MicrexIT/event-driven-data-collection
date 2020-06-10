@@ -1,0 +1,85 @@
+version: '3.1'
+services:
+  entity-store:
+    image: neo4j:3.5
+    restart: unless-stopped
+    ports:
+      - 7474:7474
+      - 7687:7687
+    volumes:
+      - ./neo4j/conf:/conf
+      - ./neo4j/data:/data
+      - ./neo4j/import:/import
+      - ./neo4j/logs:/logs
+      - ./neo4j/plugins:/plugins
+    environment:
+      # Raise memory limits
+      - NEO4J_dbms_memory_pagecache_size=1G
+      - NEO4J_dbms.memory.heap.initial_size=1G
+      - NEO4J_dbms_memory_heap_max__size=1G
+  #      - NEO4J_dbms_connector_bolt_tls__level=OPTIONAL
+  #      - NEO4J_dbms_ssl_policy_bolt_client__auth=NONE
+  #      - NEO4J_dbms_ssl_policy_https_client__auth=NONE
+  publisher:
+    build: ./publisher
+    restart: always
+    environment:
+      - EVENT_STORE=event-store:29092
+      - TOPIC=events
+    ports:
+      - '50052:50052'
+    depends_on:
+      - event-store
+  handler:
+    build: ./handler
+    restart: always
+    environment:
+      - ENTITY_STORE=entity-store:7687
+      - ENTITY_STORE_USERNAME=neo4j
+      - ENTITY_STORE_PASSWORD=qwerqwer
+      - EVENT_STORE=event-store:29092
+      - TOPIC=events
+    depends_on:
+      - event-store
+      - entity-store
+  inspector:
+    build: ./inspector
+    restart: always
+    environment:
+      - ENTITY_STORE=entity-store:7687
+      - ENTITY_STORE_USERNAME=neo4j
+      - ENTITY_STORE_PASSWORD=qwerqwer
+    ports:
+      - '50051:50051'
+    depends_on:
+      - entity-store
+  admin:
+    build: ./admin
+    restart: always
+    environment:
+      - PORT=8080
+      - ENTITY_STORE=entity-store:7687
+      - ENTITY_STORE_USERNAME=neo4j
+      - ENTITY_STORE_PASSWORD=qwerqwer
+    ports:
+      - '8080:8080'
+    depends_on:
+      - entity-store
+  event-store:
+    image: confluentinc/cp-kafka:5.4.1
+    restart: always
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://event-store:29092,PLAINTEXT_HOST://localhost:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+    ports:
+      - '9092:9092'
+    depends_on:
+      - zookeeper
+  zookeeper:
+    image: zookeeper:3.5
+    restart: always
